@@ -1,0 +1,12 @@
+pywin32
+flask
+openai
+google-generativeai
+ollama
+reportlab
+Pillow
+pystray
+keyboard
+python-dotenv
+requests
+pygments
