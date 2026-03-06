@@ -1,4 +1,4 @@
-"""
+﻿"""
 Tests for the SQLite storage layer (store.py).
 All tests use a temporary database file.
 """
@@ -14,7 +14,7 @@ from pathlib import Path
 
 @pytest.fixture()
 def store(tmp_path, monkeypatch):
-    import clipstory.db.store as store_mod
+    import clipstitch.db.store as store_mod
     monkeypatch.setattr(store_mod, "DB_PATH", tmp_path / "test.db")
     # Clear any cached thread-local connection so next _conn() opens a fresh DB
     if hasattr(store_mod._local, "conn") and store_mod._local.conn is not None:

@@ -1,4 +1,4 @@
-"""
+﻿"""
 Tests for LLM generator — prompt formatting and mock provider calls.
 No real LLM calls are made; provider is mocked.
 """
@@ -13,7 +13,7 @@ from unittest.mock import MagicMock, patch
 
 @pytest.fixture(autouse=True)
 def mem_db(tmp_path, monkeypatch):
-    import clipstory.db.store as store_mod
+    import clipstitch.db.store as store_mod
     monkeypatch.setattr(store_mod, "DB_PATH", tmp_path / "test.db")
     if hasattr(store_mod._local, "conn") and store_mod._local.conn is not None:
         store_mod._local.conn.close()
@@ -31,13 +31,13 @@ def mem_db(tmp_path, monkeypatch):
 def mock_provider():
     provider = MagicMock()
     provider.complete.return_value = "Mocked LLM response."
-    with patch("clipstory.llm.generator.get_provider", return_value=provider):
+    with patch("clipstitch.llm.generator.get_provider", return_value=provider):
         yield provider
 
 
 # ── Prompt formatting ─────────────────────────────────────────────────────────
 
-from clipstory.llm.prompts import _format_clips, _meta, MODES, MODE_LABELS  # noqa: E402
+from clipstitch.llm.prompts import _format_clips, _meta, MODES, MODE_LABELS  # noqa: E402
 
 
 _DUMMY_SESSION = {
@@ -108,7 +108,7 @@ class TestPromptFormatting:
 
 # ── Generator ─────────────────────────────────────────────────────────────────
 
-from clipstory.llm import generator  # noqa: E402
+from clipstitch.llm import generator  # noqa: E402
 
 
 class TestGenerator:

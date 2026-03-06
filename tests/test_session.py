@@ -1,4 +1,4 @@
-"""
+﻿"""
 Tests for session creation, gap detection, and resume logic.
 Uses an in-memory SQLite database to avoid touching the real DB.
 """
@@ -15,7 +15,7 @@ def mem_db(tmp_path, monkeypatch):
     """
     Redirect store to a fresh in-memory (tmp) database for every test.
     """
-    import clipstory.db.store as store_mod
+    import clipstitch.db.store as store_mod
     db_file = tmp_path / "test.db"
     monkeypatch.setattr(store_mod, "DB_PATH", db_file)
     # Clear any cached thread-local connection
@@ -31,7 +31,7 @@ def mem_db(tmp_path, monkeypatch):
 
 # ── SessionManager ─────────────────────────────────────────────────────────────
 
-from clipstory.monitor.session import SessionManager  # noqa: E402
+from clipstitch.monitor.session import SessionManager  # noqa: E402
 
 
 class TestSessionManager:

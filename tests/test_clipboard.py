@@ -1,4 +1,4 @@
-"""
+﻿"""
 Tests for clipboard type detection, deduplication, and privacy filter.
 These tests do NOT require the Win32 clipboard or pywin32.
 """
@@ -20,7 +20,7 @@ for mod_name in ["win32api", "win32clipboard", "win32con", "win32gui"]:
     stub.HWND_MESSAGE = -3
     sys.modules.setdefault(mod_name, stub)
 
-from clipstory.monitor.clipboard import _classify, _detect_language, _hash  # noqa: E402
+from clipstitch.monitor.clipboard import _classify, _detect_language, _hash  # noqa: E402
 
 
 # ── Type classification ────────────────────────────────────────────────────────
@@ -74,7 +74,7 @@ class TestHash:
 
 # ── Privacy filter ─────────────────────────────────────────────────────────────
 
-from clipstory.monitor.privacy import apply_privacy_filter  # noqa: E402
+from clipstitch.monitor.privacy import apply_privacy_filter  # noqa: E402
 
 
 class TestPrivacyFilter:
