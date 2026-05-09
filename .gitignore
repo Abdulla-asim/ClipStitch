@@ -4,4 +4,8 @@
 *.db
 *.db-shm
 *.db-wal
+*.png
+*.jpg
+*.jpeg
+.png
 

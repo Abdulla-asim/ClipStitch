@@ -6,16 +6,19 @@ CREATE TABLE IF NOT EXISTS sessions (
 );
 
 CREATE TABLE IF NOT EXISTS clips (
-    id            INTEGER PRIMARY KEY AUTOINCREMENT,
-    content       TEXT NOT NULL,
-    content_type  TEXT NOT NULL DEFAULT 'text',
-    language      TEXT,
-    page_title    TEXT,
-    session_id    INTEGER NOT NULL,
-    copied_at     TEXT NOT NULL,
-    is_redacted   INTEGER NOT NULL DEFAULT 0,
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    content          TEXT NOT NULL,
+    content_type     TEXT NOT NULL DEFAULT 'text',
+    language         TEXT,
+    page_title       TEXT,
+    thumbnail_path   TEXT,       -- path to saved PNG thumbnail (image clips)
+    image_description TEXT,      -- AI-generated description of image clips
+    session_id       INTEGER NOT NULL,
+    copied_at        TEXT NOT NULL,
+    is_redacted      INTEGER NOT NULL DEFAULT 0,
     FOREIGN KEY (session_id) REFERENCES sessions(id)
 );
+
 
 CREATE TABLE IF NOT EXISTS outputs (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,

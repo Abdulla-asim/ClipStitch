@@ -1,4 +1,4 @@
-﻿"""
+"""
 SQLite storage layer for clipstitch.
 All DB access goes through this module.
 """
@@ -27,10 +27,25 @@ def _conn() -> sqlite3.Connection:
 
 
 def init_db() -> None:
-    """Create tables from schema.sql if they don't exist."""
+    """Create tables from schema.sql if they don't exist, then migrate."""
     schema = SCHEMA_PATH.read_text(encoding="utf-8")
     con = _conn()
     con.executescript(schema)
+    con.commit()
+    migrate_db()
+
+
+def migrate_db() -> None:
+    """Add any missing columns to existing databases (safe to run repeatedly)."""
+    con = _conn()
+    existing = {r[1] for r in con.execute("PRAGMA table_info(clips)").fetchall()}
+    migrations = [
+        ("thumbnail_path",    "ALTER TABLE clips ADD COLUMN thumbnail_path TEXT"),
+        ("image_description", "ALTER TABLE clips ADD COLUMN image_description TEXT"),
+    ]
+    for col, sql in migrations:
+        if col not in existing:
+            con.execute(sql)
     con.commit()
 
 
@@ -96,18 +111,24 @@ def insert_clip(
     copied_at: datetime,
     language: str | None = None,
     page_title: str | None = None,
+    thumbnail_path: str | None = None,
+    image_description: str | None = None,
     is_redacted: bool = False,
 ) -> int:
     con = _conn()
     cur = con.execute(
         """INSERT INTO clips
-           (content, content_type, language, page_title, session_id, copied_at, is_redacted)
-           VALUES (?, ?, ?, ?, ?, ?, ?)""",
+           (content, content_type, language, page_title,
+            thumbnail_path, image_description,
+            session_id, copied_at, is_redacted)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
             content,
             content_type,
             language,
             page_title,
+            thumbnail_path,
+            image_description,
             session_id,
             copied_at.isoformat(),
             1 if is_redacted else 0,
@@ -115,6 +136,16 @@ def insert_clip(
     )
     con.commit()
     return cur.lastrowid
+
+
+def update_clip_image_description(clip_id: int, description: str) -> None:
+    """Set the AI-generated image description on an existing clip."""
+    con = _conn()
+    con.execute(
+        "UPDATE clips SET image_description=? WHERE id=?",
+        (description, clip_id),
+    )
+    con.commit()
 
 
 def get_clips_for_session(session_id: int) -> list[dict]:

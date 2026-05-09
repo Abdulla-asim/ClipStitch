@@ -1,4 +1,4 @@
-﻿/**
+/**
  * clipstitch — Dashboard JavaScript
  * Handles all UI interactions: session list, clips, selection,
  * LLM generation, export, settings, and status polling.
@@ -164,23 +164,39 @@ function renderClips() {
   el.innerHTML = state.clips.map(c => {
     const checked  = state.selectedIds.has(c.id) ? 'checked' : '';
     const selClass = state.selectedIds.has(c.id) ? ' selected' : '';
-    const badge    = typeBadge(c.content_type);
+    const bdg      = typeBadge(c.content_type);
     const time     = fmtTime(c.copied_at);
     const lang     = c.language ? `<span class="clip-lang">${c.language}</span>` : '';
     const redact   = c.is_redacted ? `<span class="clip-redacted">⚠ redacted</span>` : '';
     const title    = c.page_title ? `<div class="clip-title">↗ ${esc(c.page_title)}</div>` : '';
-    const content  = clipPreview(c);
+
+    // Image clips: show thumbnail + AI description
+    let body = '';
+    if (c.content_type === 'image') {
+      const thumb = c.thumbnail_url
+        ? `<img class="clip-thumbnail" src="${esc(c.thumbnail_url)}"
+                alt="Screenshot" onclick="event.stopPropagation(); openLightbox('${esc(c.thumbnail_url)}')">`
+        : '';
+      const desc = c.image_description
+        ? `<span class="clip-img-desc">${esc(c.image_description)}</span>`
+        : `<span class="clip-img-desc" style="opacity:0.5">Describing image…</span>`;
+      body = `
+        <div class="clip-content image-clip">${esc(c.content)}</div>
+        <div class="clip-thumbnail-wrap">${thumb}${desc}</div>`;
+    } else {
+      body = `${title}<div class="clip-content ${c.content_type}-clip">${clipPreview(c)}</div>`;
+    }
+
     return `<div class="clip-item${selClass}" id="clip-${c.id}" onclick="toggleClip(event, ${c.id})">
       <input class="clip-checkbox" type="checkbox" ${checked}
              id="chk-${c.id}" onclick="event.stopPropagation(); toggleClip(event, ${c.id})">
       <div class="clip-body">
         <div class="clip-top">
-          ${badge}
+          ${bdg}
           <span class="clip-time">${time}</span>
           ${lang}${redact}
         </div>
-        ${title}
-        <div class="clip-content ${c.content_type}-clip">${content}</div>
+        ${body}
       </div>
     </div>`;
   }).join('');
@@ -193,7 +209,7 @@ function clipPreview(c) {
 }
 
 function typeBadge(t) {
-  const map = { text: 'TEXT', url: 'URL', code: 'CODE' };
+  const map = { text: 'TEXT', url: 'URL', code: 'CODE', image: 'IMAGE 🖼' };
   return `<span class="clip-badge badge-${t}">${map[t] || t.toUpperCase()}</span>`;
 }
 
@@ -340,17 +356,21 @@ async function loadSettings() {
   try {
     const cfg = await api('/api/settings');
     document.getElementById('cfgProvider').value       = cfg.llm?.provider || 'openai';
-    document.getElementById('cfgModel').value          = cfg.llm?.model || '';
+    document.getElementById('cfgOpenAIKey').value      = cfg.llm?.openai_api_key || '';
+    document.getElementById('cfgGeminiKey').value      = cfg.llm?.gemini_api_key || '';
     document.getElementById('cfgOllamaHost').value     = cfg.llm?.ollama_host || '';
     document.getElementById('cfgOllamaModel').value    = cfg.llm?.ollama_model || '';
     document.getElementById('cfgSessionGap').value     = cfg.monitor?.session_gap_minutes || 30;
     document.getElementById('cfgDedupWindow').value    = cfg.monitor?.dedup_window || 5;
+    document.getElementById('cfgVisionDescribe').checked = cfg.monitor?.vision_describe !== false;
     document.getElementById('cfgRedactKeys').checked   = !!cfg.privacy?.redact_api_keys;
     document.getElementById('cfgRedactPasswords').checked = !!cfg.privacy?.redact_passwords;
     document.getElementById('cfgRedactEmails').checked = !!cfg.privacy?.redact_emails;
     document.getElementById('cfgPort').value           = cfg.web?.port || 5050;
     document.getElementById('cfgOpenOnStart').checked  = !!cfg.web?.open_on_start;
+    // Populate model dropdown (pass current model so it gets pre-selected)
     onProviderChange();
+    await fetchAndPopulateModels(cfg.llm?.model || '');
   } catch (e) {
     console.error('Failed to load settings', e);
   }
@@ -359,9 +379,74 @@ async function loadSettings() {
 function onProviderChange() {
   const val = document.getElementById('cfgProvider').value;
   const isOllama = val === 'ollama';
+  const isOpenAI = val === 'openai';
+  const isGemini = val === 'gemini';
+  document.getElementById('rowOpenAIKey').style.display  = isOpenAI ? '' : 'none';
+  document.getElementById('rowGeminiKey').style.display  = isGemini ? '' : 'none';
   document.getElementById('rowOllamaHost').style.display  = isOllama ? '' : 'none';
   document.getElementById('rowOllamaModel').style.display = isOllama ? '' : 'none';
   document.getElementById('rowModel').style.display       = isOllama ? 'none' : '';
+  if (!isOllama) fetchAndPopulateModels();
+}
+
+async function fetchAndPopulateModels(currentModel) {
+  const provider  = document.getElementById('cfgProvider').value;
+  const select    = document.getElementById('cfgModel');
+  const btn       = document.getElementById('modelRefreshBtn');
+
+  btn.textContent = '⏳';
+  btn.disabled    = true;
+  select.disabled = true;
+
+  // Remember what was previously selected (passed in or from current value)
+  const previous = currentModel || select.value;
+
+  try {
+    const data = await api(`/api/models?provider=${encodeURIComponent(provider)}`);
+    const models = data.models || [];
+
+    select.innerHTML = '';
+    if (!models.length) {
+      // No models returned — add a placeholder so user can still type
+      const opt = document.createElement('option');
+      opt.value = previous;
+      opt.textContent = previous || '(no models found)';
+      select.appendChild(opt);
+    } else {
+      models.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m;
+        opt.textContent = m;
+        if (m === previous) opt.selected = true;
+        select.appendChild(opt);
+      });
+      // If previous model not in list, still select something sensible
+      if (previous && !models.includes(previous)) {
+        const opt = document.createElement('option');
+        opt.value = previous;
+        opt.textContent = `${previous} (current)`;
+        opt.selected = true;
+        select.insertBefore(opt, select.firstChild);
+      }
+    }
+
+    if (data.error) {
+      btn.title = `Error: ${data.error}`;
+    }
+  } catch (e) {
+    console.warn('Could not fetch models:', e);
+    // Fall back: keep a single option with the previous value
+    if (!select.options.length) {
+      const opt = document.createElement('option');
+      opt.value = previous;
+      opt.textContent = previous || 'unknown';
+      select.appendChild(opt);
+    }
+  } finally {
+    btn.textContent = '↺';
+    btn.disabled    = false;
+    select.disabled = false;
+  }
 }
 
 async function saveSettings() {
@@ -370,6 +455,8 @@ async function saveSettings() {
   const body = {
     llm: {
       provider,
+      openai_api_key:  document.getElementById('cfgOpenAIKey').value || undefined,
+      gemini_api_key:  document.getElementById('cfgGeminiKey').value || undefined,
       model:        document.getElementById('cfgModel').value,
       ollama_host:  document.getElementById('cfgOllamaHost').value,
       ollama_model: document.getElementById('cfgOllamaModel').value,
@@ -377,6 +464,7 @@ async function saveSettings() {
     monitor: {
       session_gap_minutes: parseInt(document.getElementById('cfgSessionGap').value, 10),
       dedup_window:        parseInt(document.getElementById('cfgDedupWindow').value, 10),
+      vision_describe:     document.getElementById('cfgVisionDescribe').checked,
     },
     privacy: {
       redact_api_keys:  document.getElementById('cfgRedactKeys').checked,
@@ -426,6 +514,24 @@ function showError(msg) {
     <div class="empty-icon">⚠</div>
     <p>${esc(msg)}</p>
   </div>`;
+}
+
+// ── Image Lightbox ──────────────────────────────────────────────────────────────
+
+function openLightbox(src) {
+  document.getElementById('img-lightbox-img').src = src;
+  document.getElementById('img-lightbox').classList.add('visible');
+  // Close on Escape
+  document._lightboxEsc = e => { if (e.key === 'Escape') closeLightbox(); };
+  document.addEventListener('keydown', document._lightboxEsc);
+}
+
+function closeLightbox() {
+  document.getElementById('img-lightbox').classList.remove('visible');
+  if (document._lightboxEsc) {
+    document.removeEventListener('keydown', document._lightboxEsc);
+    document._lightboxEsc = null;
+  }
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────

@@ -57,7 +57,7 @@ body {
   letter-spacing: -0.02em;
 }
 .brand-icon { font-size: 1.3rem; }
-.brand-name { background: linear-gradient(90deg, #6366f1, #a78bfa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.brand-name { background: linear-gradient(90deg, #6366f1, #a78bfa); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
 
 .header-status {
   display: flex;
@@ -213,6 +213,7 @@ body {
 .badge-text    { background: rgba(52,211,153,0.15);  color: var(--emerald); }
 .badge-url     { background: rgba(56,189,248,0.15);  color: var(--sky); }
 .badge-code    { background: rgba(167,139,250,0.15); color: var(--violet); }
+.badge-image   { background: rgba(251,191,36,0.15);  color: var(--amber); }
 
 .clip-time { font-size: 0.68rem; color: var(--text-muted); }
 .clip-lang { font-size: 0.65rem; color: var(--violet); }
@@ -228,10 +229,55 @@ body {
   font-family: 'JetBrains Mono', monospace;
   line-height: 1.4;
 }
-.clip-content.code-clip { color: var(--violet); }
-.clip-content.url-clip  { color: var(--sky); }
+.clip-content.code-clip  { color: var(--violet); }
+.clip-content.url-clip   { color: var(--sky); }
+.clip-content.image-clip { color: var(--amber); font-style: italic; }
+
+/* Image clip thumbnail card */
+.clip-thumbnail-wrap {
+  display: flex;
+  gap: 0.65rem;
+  align-items: flex-start;
+  margin-top: 0.35rem;
+}
+.clip-thumbnail {
+  width: 80px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+  cursor: zoom-in;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.clip-thumbnail:hover { transform: scale(1.05); box-shadow: 0 4px 16px rgba(0,0,0,0.5); }
+.clip-img-desc {
+  font-size: 0.73rem;
+  color: var(--text-dim);
+  line-height: 1.45;
+  white-space: normal;
+  font-style: italic;
+  font-family: 'Inter', sans-serif;
+}
+
+/* Lightbox overlay for thumbnail zoom */
+#img-lightbox {
+  display: none;
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(0,0,0,0.85);
+  backdrop-filter: blur(6px);
+  align-items: center; justify-content: center;
+  cursor: zoom-out;
+}
+#img-lightbox.visible { display: flex; }
+#img-lightbox img {
+  max-width: 90vw; max-height: 90vh;
+  border-radius: 8px;
+  box-shadow: 0 16px 64px rgba(0,0,0,0.8);
+}
 
 .clip-title { font-size: 0.72rem; color: var(--sky); font-weight: 500; }
+
 
 /* ── Output panel ────────────────────────────────────────────────────────── */
 .panel-output { background: var(--surface); }

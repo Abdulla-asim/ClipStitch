@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -110,17 +110,43 @@
           <option value="ollama">Ollama (Local)</option>
         </select>
       </div>
+
+      <!-- OpenAI API Key -->
+      <div class="form-row" id="rowOpenAIKey" style="display:none">
+        <label>OpenAI API Key</label>
+        <input id="cfgOpenAIKey" type="password" placeholder="sk-..." />
+        <small style="color:var(--text-muted);margin-top:0.2rem;display:block">
+          Get your key from <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com</a>
+        </small>
+      </div>
+
+      <!-- Gemini API Key -->
+      <div class="form-row" id="rowGeminiKey" style="display:none">
+        <label>Google Gemini API Key</label>
+        <input id="cfgGeminiKey" type="password" placeholder="AIzaSy..." />
+        <small style="color:var(--text-muted);margin-top:0.2rem;display:block">
+          Get your key from <a href="https://aistudio.google.com/app/apikey" target="_blank">aistudio.google.com</a>
+        </small>
+      </div>
+
       <div class="form-row" id="rowModel">
         <label>Model</label>
-        <input id="cfgModel" type="text" />
+        <div style="display:flex;gap:0.4rem;flex:1;max-width:260px">
+          <select id="cfgModel" style="flex:1"></select>
+          <button class="icon-btn" id="modelRefreshBtn" title="Reload models from API"
+                  onclick="fetchAndPopulateModels()" style="flex-shrink:0">↺</button>
+        </div>
       </div>
       <div class="form-row" id="rowOllamaHost" style="display:none">
         <label>Ollama Host</label>
-        <input id="cfgOllamaHost" type="text" />
+        <input id="cfgOllamaHost" type="text" placeholder="http://localhost:11434" />
+        <small style="color:var(--text-muted);margin-top:0.2rem;display:block">
+          Ollama should be running locally. <a href="https://ollama.ai" target="_blank">Install Ollama</a>
+        </small>
       </div>
       <div class="form-row" id="rowOllamaModel" style="display:none">
         <label>Ollama Model</label>
-        <input id="cfgOllamaModel" type="text" />
+        <input id="cfgOllamaModel" type="text" placeholder="llama3.1:8b" />
       </div>
     </section>
 
@@ -133,6 +159,10 @@
       <div class="form-row">
         <label>Dedup Window (clips)</label>
         <input id="cfgDedupWindow" type="number" min="1" max="20" />
+      </div>
+      <div class="form-row toggle-row">
+        <label>AI Vision Descriptions for Images</label>
+        <label class="toggle"><input id="cfgVisionDescribe" type="checkbox" /><span></span></label>
       </div>
     </section>
 
@@ -171,7 +201,12 @@
   </div>
 </main>
 
-<!-- ── Loading overlay ────────────────────────────────────────────────────── -->
+<!-- ── Image Lightbox ──────────────────────────────────────────────────────── -->
+<div id="img-lightbox" onclick="closeLightbox()">
+  <img id="img-lightbox-img" src="" alt="Screenshot preview" />
+</div>
+
+<!-- ── Loading overlay ────────────────────────────────────────────────────────── -->
 <div class="loading-overlay" id="loadingOverlay">
   <div class="spinner"></div>
   <p id="loadingMsg">Generating…</p>

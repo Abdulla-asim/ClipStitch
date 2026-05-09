@@ -1,4 +1,4 @@
-﻿"""
+"""
 Flask web application for clipstitch.
 Serves the dashboard UI and provides the REST API.
 """
@@ -6,6 +6,7 @@ Serves the dashboard UI and provides the REST API.
 import json
 import logging
 from datetime import datetime
+from pathlib import Path
 
 from flask import Flask, jsonify, request, send_file, render_template, Response
 import io
@@ -84,7 +85,26 @@ def api_session(session_id):
 @app.get("/api/sessions/<int:session_id>/clips")
 def api_clips(session_id):
     clips = store.get_clips_for_session(session_id)
+    # Inject thumbnail URL for image clips so the frontend can display them
+    for c in clips:
+        if c.get("thumbnail_path"):
+            fname = Path(c["thumbnail_path"]).name
+            c["thumbnail_url"] = f"/api/thumbnails/{fname}"
+        else:
+            c["thumbnail_url"] = None
     return jsonify(clips)
+
+
+# ─── Thumbnails ──────────────────────────────────────────────────────────────
+
+@app.get("/api/thumbnails/<path:filename>")
+def api_thumbnail(filename):
+    """Serve a saved thumbnail PNG by filename."""
+    from clipstitch.monitor.image import _THUMB_DIR
+    thumb_path = _THUMB_DIR / filename
+    if not thumb_path.exists():
+        return jsonify({"error": "Thumbnail not found"}), 404
+    return send_file(str(thumb_path), mimetype="image/png")
 
 
 # ─── Generate ────────────────────────────────────────────────────────────────
@@ -163,6 +183,66 @@ def api_export_md(session_id):
 @app.get("/api/settings")
 def api_settings_get():
     return jsonify(cfg.config)
+
+
+@app.get("/api/models")
+def api_models():
+    """Return available models for a given provider (used to populate the dropdown)."""
+    provider = request.args.get("provider", cfg.get("llm.provider", "openai")).lower()
+    try:
+        models = _list_models(provider)
+        return jsonify({"provider": provider, "models": models})
+    except Exception as e:
+        log.warning("Could not list models for %s: %s", provider, e)
+        return jsonify({"provider": provider, "models": [], "error": str(e)}), 200
+
+
+def _list_models(provider: str) -> list[str]:
+    import os
+    if provider == "gemini":
+        import google.generativeai as genai
+        api_key = os.getenv("GEMINI_API_KEY") or cfg.get("llm.gemini_api_key")
+        if not api_key:
+            raise ValueError("GEMINI_API_KEY not set")
+        genai.configure(api_key=api_key)
+        names = []
+        for m in genai.list_models():
+            if "generateContent" in m.supported_generation_methods:
+                # Strip the "models/" prefix for the config value
+                name = m.name.replace("models/", "")
+                # Only include flagship Gemini models (skip Gemma / TTS / image-only)
+                if name.startswith("gemini") and "tts" not in name \
+                        and "image-generation" not in name \
+                        and "computer-use" not in name \
+                        and "deep-research" not in name \
+                        and "robotics" not in name \
+                        and "banana" not in name:
+                    names.append(name)
+        return sorted(set(names))
+
+    elif provider == "openai":
+        from openai import OpenAI
+        api_key = os.getenv("OPENAI_API_KEY") or cfg.get("llm.openai_api_key")
+        if not api_key:
+            raise ValueError("OPENAI_API_KEY not set")
+        client = OpenAI(api_key=api_key)
+        all_models = [m.id for m in client.models.list()]
+        # Only show GPT chat models
+        chat_models = sorted(
+            [m for m in all_models if m.startswith("gpt")],
+            reverse=True
+        )
+        return chat_models or all_models[:20]
+
+    elif provider == "ollama":
+        import requests as _req
+        host = cfg.get("llm.ollama_host", "http://localhost:11434")
+        resp = _req.get(f"{host}/api/tags", timeout=5)
+        resp.raise_for_status()
+        return [m["name"] for m in resp.json().get("models", [])]
+
+    return []
+
 
 
 @app.post("/api/settings")

@@ -1,13 +1,16 @@
 {
   "llm": {
-    "provider": "openai",
-    "model": "gpt-4o-mini",
+    "provider": "gemini",
+    "model": "gemini-2.5-flash",
+    "openai_api_key": "",
+    "gemini_api_key": "AIzaSyDuMtKZoRP5NPKAIH9OXsIwyKe-rYf0Qzc",
     "ollama_host": "http://localhost:11434",
-    "ollama_model": "llama3"
+    "ollama_model": "llama3.1:8b"
   },
   "monitor": {
     "session_gap_minutes": 30,
-    "dedup_window": 5
+    "dedup_window": 5,
+    "vision_describe": true
   },
   "privacy": {
     "redact_api_keys": true,

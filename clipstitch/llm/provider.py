@@ -1,4 +1,4 @@
-﻿"""
+"""
 LLM provider abstraction for clipstitch.
 Supports OpenAI, Google Gemini, and local Ollama.
 """
@@ -18,15 +18,25 @@ class LLMProvider(ABC):
         """Send a system+user prompt; return the response text."""
         ...
 
+    def describe_image(self, image_path: str) -> str | None:
+        """
+        Return a one-paragraph description of the image at image_path.
+        Default implementation returns None (provider doesn't support vision).
+        """
+        return None
+
 
 # ─── OpenAI ──────────────────────────────────────────────────────────────────
 
 class OpenAIProvider(LLMProvider):
     def __init__(self):
         from openai import OpenAI
-        api_key = os.getenv("OPENAI_API_KEY")
+        # Try environment variable first, then config
+        api_key = os.getenv("OPENAI_API_KEY") or get("llm.openai_api_key")
         if not api_key:
-            raise ValueError("OPENAI_API_KEY not set in .env")
+            raise ValueError(
+                "OPENAI_API_KEY not set. Please set it in .env or in Settings > LLM Provider"
+            )
         self._client = OpenAI(api_key=api_key)
         self._model = get("llm.model", "gpt-4o-mini")
 
@@ -41,15 +51,48 @@ class OpenAIProvider(LLMProvider):
         )
         return resp.choices[0].message.content.strip()
 
+    def describe_image(self, image_path: str) -> str | None:
+        """Use GPT-4o vision to describe a screenshot/image."""
+        from clipstitch.monitor.image import image_to_base64
+        b64 = image_to_base64(image_path)
+        # Use a vision-capable model; fall back to gpt-4o if configured model lacks vision
+        vision_model = self._model if "gpt-4" in self._model else "gpt-4o"
+        try:
+            resp = self._client.chat.completions.create(
+                model=vision_model,
+                messages=[{
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": (
+                            "Describe what is shown in this screenshot in 1-3 concise sentences. "
+                            "Focus on the main content: text visible, UI elements, subject matter, "
+                            "charts or diagrams if present."
+                        )},
+                        {"type": "image_url", "image_url": {
+                            "url": f"data:image/png;base64,{b64}",
+                            "detail": "low",
+                        }},
+                    ],
+                }],
+                max_tokens=200,
+            )
+            return resp.choices[0].message.content.strip()
+        except Exception as e:
+            log.warning("OpenAI vision failed: %s", e)
+            return None
+
 
 # ─── Gemini ───────────────────────────────────────────────────────────────────
 
 class GeminiProvider(LLMProvider):
     def __init__(self):
         import google.generativeai as genai
-        api_key = os.getenv("GEMINI_API_KEY")
+        # Try environment variable first, then config
+        api_key = os.getenv("GEMINI_API_KEY") or get("llm.gemini_api_key")
         if not api_key:
-            raise ValueError("GEMINI_API_KEY not set in .env")
+            raise ValueError(
+                "GEMINI_API_KEY not set. Please set it in .env or in Settings > LLM Provider"
+            )
         genai.configure(api_key=api_key)
         model_name = get("llm.model", "gemini-1.5-flash")
         self._model = genai.GenerativeModel(
@@ -61,6 +104,26 @@ class GeminiProvider(LLMProvider):
         combined = f"{system}\n\n{user}"
         resp = self._model.generate_content(combined)
         return resp.text.strip()
+
+    def describe_image(self, image_path: str) -> str | None:
+        """Use Gemini vision to describe a screenshot/image."""
+        try:
+            import google.generativeai as genai
+            from PIL import Image as PILImage
+            img = PILImage.open(image_path)
+            # Use the configured model (already initialised); fall back to gemini-2.0-flash
+            model_name = get("llm.model", "gemini-2.0-flash")
+            vision_model = genai.GenerativeModel(model_name)
+            resp = vision_model.generate_content([
+                "Describe what is shown in this screenshot in 1-3 concise sentences. "
+                "Focus on the main content: text visible, UI elements, subject matter, "
+                "charts or diagrams if present.",
+                img,
+            ])
+            return resp.text.strip()
+        except Exception as e:
+            log.warning("Gemini vision failed: %s", e)
+            return None
 
 
 # ─── Ollama ───────────────────────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-﻿"""
+"""
 Event-driven Win32 clipboard monitor for clipstitch.
 
 Uses WM_CLIPBOARDUPDATE message (AddClipboardFormatListener) so the OS
@@ -147,6 +147,14 @@ class ClipboardMonitor(threading.Thread):
         """Called by the Win32 message loop on every clipboard change."""
         if self._paused:
             return
+
+        # ── Image path (check BEFORE text) ────────────────────────────────────
+        from clipstitch.monitor.image import has_image_on_clipboard
+        if has_image_on_clipboard():
+            self._executor.submit(self._store_image_clip, datetime.now())
+            return
+
+        # ── Text / URL / Code path ────────────────────────────────────────────
         try:
             win32clipboard.OpenClipboard()
             try:
@@ -199,6 +207,37 @@ class ClipboardMonitor(threading.Thread):
         title = _fetch_page_title(url)
         store.insert_clip(url, "url", sid, ts, page_title=title, is_redacted=redacted)
         log.debug("Stored URL clip: %s (title=%s)", url, title)
+
+    def _store_image_clip(self, ts: datetime) -> None:
+        """Capture image from clipboard, save thumbnail, store clip, trigger vision AI."""
+        from clipstitch.monitor.image import (
+            capture_image_from_clipboard, save_thumbnail, describe_image_async
+        )
+        img = capture_image_from_clipboard()
+        if img is None:
+            return
+
+        self._session.record_clip(ts)
+        sid = self._session.current_session_id
+
+        # Save thumbnail first (we need a path for the DB record)
+        try:
+            thumb_path = save_thumbnail(img, f"s{sid}")
+        except Exception as e:
+            log.warning("Could not save thumbnail: %s", e)
+            return
+
+        # Content field stores a human-readable label
+        label = f"[Image {img.width}×{img.height}px]"
+        clip_id = store.insert_clip(
+            label, "image", sid, ts,
+            thumbnail_path=thumb_path,
+        )
+        log.debug("Stored image clip id=%d (%s)", clip_id, label)
+
+        # Ask vision AI to describe it asynchronously (won't block monitoring)
+        if get("monitor.vision_describe", True):
+            describe_image_async(clip_id, thumb_path)
 
     def _is_duplicate(self, content: str) -> bool:
         """Return True if content matches any of the last N clips in the session."""

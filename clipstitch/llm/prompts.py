@@ -1,4 +1,4 @@
-﻿"""
+"""
 Prompt templates for all clipstitch output modes.
 Each template is a function that receives clip data and session metadata,
 and returns (system_prompt, user_prompt) ready for the LLM.
@@ -16,11 +16,21 @@ def _format_clips(clips: list[dict]) -> str:
         lang  = f" [{c['language']}]" if c.get("language") else ""
         title = f' — "{c["page_title"]}"' if c.get("page_title") else ""
         content = c.get("content", "").strip()
+
+        # For image clips, use the AI description if available
+        if ctype == "IMAGE":
+            desc = c.get("image_description")
+            if desc:
+                content = f"[Screenshot/Image] {desc}"
+            else:
+                content = content  # fallback to "[Image NxMpx]" label
+
         # Truncate very long clips in the prompt
         if len(content) > 800:
             content = content[:800] + "… [truncated]"
         lines.append(f"{i}. [{ts}] ({ctype}{lang}{title})\n   {content}")
     return "\n\n".join(lines)
+
 
 
 def _meta(session: dict, clips: list[dict]) -> dict:
