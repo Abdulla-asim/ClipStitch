@@ -1,11 +1,14 @@
 *.md
+!report.md
 .env*
+!.env.example
 *.log
 *.db
 *.db-shm
 *.db-wal
-*.png
 *.jpg
 *.jpeg
-.png
-
+*.zip
+*.png
+!dashboard.png
+config.json
